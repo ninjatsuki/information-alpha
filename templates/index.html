@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Alpha</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="container">
+    <header class="page-header">
+      <p class="eyebrow">Information Alpha</p>
+      <h1>Alpha</h1>
+      <p class="subtitle" id="subtitle">No scans yet</p>
+    </header>
+
+    <section class="action">
+      <button id="runBtn" class="btn-primary">
+        <span class="btn-label">Scan the Edge</span>
+      </button>
+    </section>
+
+    <section id="stats" class="stats hidden">
+      <div class="stat">
+        <div class="stat-value" id="statRaw">—</div>
+        <div class="stat-label">Raw</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="statAlpha">—</div>
+        <div class="stat-label">Alpha</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="statAvg">—</div>
+        <div class="stat-label">Avg Score</div>
+      </div>
+    </section>
+
+    <section class="results">
+      <h2 class="section-title">Signals</h2>
+      <div id="cards" class="cards"></div>
+      <p id="empty" class="empty">Tap "Scan the Edge" to begin.</p>
+    </section>
+  </main>
+
+  <div id="loader" class="loader hidden">
+    <div class="spinner"></div>
+    <p>Scanning the edge…</p>
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const cardsEl = $('#cards');
+    const emptyEl = $('#empty');
+    const statsEl = $('#stats');
+    const loaderEl = $('#loader');
+    const subtitleEl = $('#subtitle');
+    const runBtn = $('#runBtn');
+
+    const catColors = {
+      new_niche: 'green',
+      loophole: 'purple',
+      first_mover_tool: 'blue',
+    };
+    const catLabels = {
+      new_niche: 'New Niche',
+      loophole: 'Loophole',
+      first_mover_tool: 'First Mover',
+    };
+
+    function scoreClass(s) {
+      if (s >= 8) return 'critical';
+      if (s >= 5) return 'moderate';
+      return 'low';
+    }
+
+    function escapeHtml(s) {
+      if (s == null) return '';
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    function renderCard(it) {
+      const cat = it.category || 'unknown';
+      const safeUrl = it.url && /^https?:\/\//.test(it.url) ? it.url : '';
+      return `
+        <article class="card">
+          <div class="card-row">
+            <span class="pill pill-${catColors[cat] || 'gray'}">${catLabels[cat] || escapeHtml(cat)}</span>
+            <span class="score score-${scoreClass(it.alpha_score)}">${it.alpha_score ?? '—'}</span>
+          </div>
+          <h3 class="card-title">${escapeHtml(it.title)}</h3>
+          <p class="card-summary">${escapeHtml(it.summary)}</p>
+          <details class="card-details">
+            <summary>Why it's alpha</summary>
+            <p>${escapeHtml(it.why_alpha)}</p>
+          </details>
+          <div class="card-meta">
+            <span>${escapeHtml(it.source || '')}</span>
+            <span>Perish ${it.perishability ?? '—'}/10</span>
+          </div>
+          ${safeUrl ? `<a class="card-link" href="${safeUrl}" target="_blank" rel="noopener noreferrer">Open →</a>` : ''}
+        </article>
+      `;
+    }
+
+    function render(result) {
+      const items = (result && result.items) || [];
+      if (!items.length) {
+        cardsEl.innerHTML = '';
+        emptyEl.classList.remove('hidden');
+        emptyEl.textContent = result && result.timestamp
+          ? 'Last scan found no alpha signals.'
+          : 'Tap "Scan the Edge" to begin.';
+        statsEl.classList.add('hidden');
+      } else {
+        emptyEl.classList.add('hidden');
+        cardsEl.innerHTML = items.map(renderCard).join('');
+        const avg = (items.reduce((a, b) => a + (b.alpha_score || 0), 0) / items.length).toFixed(1);
+        $('#statRaw').textContent = result.raw_count ?? '—';
+        $('#statAlpha').textContent = items.length;
+        $('#statAvg').textContent = avg;
+        statsEl.classList.remove('hidden');
+      }
+      if (result && result.timestamp) {
+        const d = new Date(result.timestamp);
+        subtitleEl.textContent = `Last scan ${d.toLocaleString()}`;
+      }
+    }
+
+    async function run() {
+      runBtn.disabled = true;
+      loaderEl.classList.remove('hidden');
+      try {
+        const r = await fetch('/api/run', { method: 'POST' });
+        if (!r.ok) throw new Error('Server error ' + r.status);
+        const data = await r.json();
+        render(data);
+      } catch (e) {
+        alert('Scan failed: ' + e.message);
+      } finally {
+        runBtn.disabled = false;
+        loaderEl.classList.add('hidden');
+      }
+    }
+
+    async function loadCached() {
+      try {
+        const r = await fetch('/api/cached');
+        const data = await r.json();
+        if (data && data.items && data.items.length) render(data);
+      } catch (_) {}
+    }
+
+    runBtn.addEventListener('click', run);
+    loadCached();
+  </script>
+</body>
+</html>

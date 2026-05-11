@@ -1,0 +1,26 @@
+# Secrets
+.env
+
+# Generated briefs (personal/private data)
+00_Intelligence_Inbox/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+.python-version
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Distribution
+build/
+dist/
+*.egg
